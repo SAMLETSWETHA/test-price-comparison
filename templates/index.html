@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Price Comparison</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body>
+    <div class="container">
+        <h1>Diagnostic Test Price Comparison</h1>
+        <p class="subtitle">Search by typing, selecting, or uploading prescription</p>
+
+        <div class="search-box">
+            <input type="text" id="test_name" placeholder="Type test name" onkeyup="getSuggestions()" list="testList">
+
+            <datalist id="testList">
+                {% for test in tests %}
+                <option value="{{ test }}">
+                    {% endfor %}
+            </datalist>
+
+            <select id="city">
+                <option value="">Select City</option>
+                {% for city in cities %}
+                <option value="{{ city }}">{{ city }}</option>
+                {% endfor %}
+            </select>
+
+            <select id="area">
+                <option value="">Select Area</option>
+                {% for area in areas %}
+                <option value="{{ area }}">{{ area }}</option>
+                {% endfor %}
+            </select>
+
+            <button onclick="searchTests()">Search</button>
+
+            <div id="suggestions" class="suggestions-box"></div>
+        </div>
+
+        <div class="upload-box">
+            <input type="file" id="prescription" accept="image/*">
+            <button onclick="uploadPrescription()">Upload Prescription</button>
+        </div>
+
+        <div id="ocr-result"></div>
+        <div id="results"></div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+
+</html>
