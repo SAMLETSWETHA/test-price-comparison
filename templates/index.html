@@ -4,50 +4,60 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Test Price Comparison</title>
+    <title>Diagnostic Test Price Comparison</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 
 <body>
-    <div class="container">
-        <h1>Diagnostic Test Price Comparison</h1>
-        <p class="subtitle">Search by typing, selecting, or uploading prescription</p>
 
-        <div class="search-box">
-            <input type="text" id="test_name" placeholder="Type test name" onkeyup="getSuggestions()" list="testList">
+    <div class="main-container">
+        <div class="card">
+            <h1>Diagnostic Test Price Comparison</h1>
+            <p class="subtitle">Search by typing, selecting area, or asking AI assistant</p>
 
-            <datalist id="testList">
-                {% for test in tests %}
-                <option value="{{ test }}">
-                    {% endfor %}
-            </datalist>
+            <div class="search-section">
+                <input list="testList" id="testInput" placeholder="Type test name">
+                <datalist id="testList"></datalist>
 
-            <select id="city">
-                <option value="">Select City</option>
-                {% for city in cities %}
-                <option value="{{ city }}">{{ city }}</option>
-                {% endfor %}
-            </select>
+                <select id="citySelect">
+                    <option value="">Select City</option>
+                </select>
 
-            <select id="area">
-                <option value="">Select Area</option>
-                {% for area in areas %}
-                <option value="{{ area }}">{{ area }}</option>
-                {% endfor %}
-            </select>
+                <select id="areaSelect">
+                    <option value="">Select Area</option>
+                </select>
 
-            <button onclick="searchTests()">Search</button>
+                <button onclick="searchTests()">Search</button>
+            </div>
 
-            <div id="suggestions" class="suggestions-box"></div>
+            <hr>
+
+            <div class="upload-section">
+                <input type="file" id="prescriptionFile">
+                <button onclick="uploadPrescription()">Upload Prescription</button>
+            </div>
         </div>
 
-        <div class="upload-box">
-            <input type="file" id="prescription" accept="image/*">
-            <button onclick="uploadPrescription()">Upload Prescription</button>
+        <div id="resultSection" class="result-section"></div>
+    </div>
+
+    <button class="chat-icon" onclick="toggleChat()">Ask AI</button>
+
+    <div class="chat-box" id="chatBox">
+        <div class="chat-header">
+            <h3>AI Assistant</h3>
+            <button onclick="toggleChat()">×</button>
         </div>
 
-        <div id="ocr-result"></div>
-        <div id="results"></div>
+        <div id="chatMessages" class="chat-messages">
+            <p class="bot">Hi! Ask me: Which lab is cheapest for blood test in Ramnagar?</p>
+        </div>
+
+        <div class="chat-input">
+            <input type="text" id="userMessage" placeholder="Ask about test price or location...">
+            <button class="mic-btn" onclick="startVoiceInput()" title="Speak">🎤</button>
+            <button onclick="askAI()">Send</button>
+        </div>
     </div>
 
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>

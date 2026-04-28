@@ -1,141 +1,217 @@
-function getSuggestions() {
-    const query = document.getElementById("test_name").value;
+window.onload = async function () {
+    await loadFilters();
 
-    fetch(`/suggest-tests?q=${encodeURIComponent(query)}`)
-        .then(response => response.json())
-        .then(data => {
-            const suggestionsBox = document.getElementById("suggestions");
-            suggestionsBox.innerHTML = "";
+    const userMessage = document.getElementById("userMessage");
+    userMessage.addEventListener("keypress", function (e) {
+        if (e.key === "Enter") {
+            askAI();
+        }
+    });
+};
 
-            if (query.trim() === "" || data.length === 0) {
-                return;
-            }
+async function loadFilters() {
+    try {
+        const response = await fetch("/get-filters");
+        const data = await response.json();
 
-            data.forEach(test => {
-                const item = document.createElement("div");
-                item.className = "suggestion-item";
-                item.innerText = test;
-                item.onclick = function () {
-                    document.getElementById("test_name").value = test;
-                    suggestionsBox.innerHTML = "";
-                };
-                suggestionsBox.appendChild(item);
-            });
+        const citySelect = document.getElementById("citySelect");
+        const areaSelect = document.getElementById("areaSelect");
+        const testList = document.getElementById("testList");
+
+        citySelect.innerHTML = `<option value="">Select City</option>`;
+        areaSelect.innerHTML = `<option value="">Select Area</option>`;
+        testList.innerHTML = "";
+
+        data.cities.forEach(city => {
+            citySelect.innerHTML += `<option value="${city}">${city}</option>`;
         });
+
+        data.areas.forEach(area => {
+            areaSelect.innerHTML += `<option value="${area}">${area}</option>`;
+        });
+
+        data.tests.forEach(test => {
+            testList.innerHTML += `<option value="${test}">`;
+        });
+
+    } catch (error) {
+        console.error("Error loading filters:", error);
+    }
 }
 
-function searchTests() {
-    const testName = document.getElementById("test_name").value;
-    const city = document.getElementById("city").value;
-    const area = document.getElementById("area").value;
+async function searchTests() {
+    const test = document.getElementById("testInput").value.trim();
+    const city = document.getElementById("citySelect").value;
+    const area = document.getElementById("areaSelect").value;
+    const resultSection = document.getElementById("resultSection");
 
-    const formData = new FormData();
-    formData.append("test_name", testName);
-    formData.append("city", city);
-    formData.append("area", area);
+    resultSection.innerHTML = "<p class='loading'>Searching...</p>";
 
-    fetch("/search", {
-        method: "POST",
-        body: formData
-    })
-        .then(response => response.json())
-        .then(data => {
-            const resultsDiv = document.getElementById("results");
-            resultsDiv.innerHTML = "";
+    try {
+        const response = await fetch("/search", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ test, city, area })
+        });
 
-            if (data.length === 0) {
-                resultsDiv.innerHTML = `<p class="no-results">No matching tests found.</p>`;
-                return;
-            }
+        const data = await response.json();
 
-            data.forEach(item => {
-                const card = document.createElement("div");
-                card.className = "result-card";
+        if (data.status === "error") {
+            resultSection.innerHTML = `<p class="error">${data.message}</p>`;
+            return;
+        }
 
-                card.innerHTML = `
-                <h3>${item.Lab_Name}</h3>
-                <p><strong>Test:</strong> ${item.Test_Name}</p>
-                <p><strong>City:</strong> ${item.City}</p>
-                <p><strong>Area:</strong> ${item.Area}</p>
-                <p class="price">₹ ${item.Price}</p>
-                <button class="nav-btn" onclick="navigateToLab('${item.Latitude}', '${item.Longitude}')">Navigate</button>
+        let html = `
+            <div class="best-card">
+                <h2>Best Cheapest Option</h2>
+                <p><b>Lab:</b> ${data.cheapest.Lab_Name}</p>
+                <p><b>Test:</b> ${data.cheapest.Test_Name}</p>
+                <p><b>Price:</b> ₹${data.cheapest.Price}</p>
+                <p><b>Area:</b> ${data.cheapest.Area}</p>
+                <p><b>City:</b> ${data.cheapest.City}</p>
+                <button class="map-btn" onclick="openCurrentLocationMap(${data.cheapest.Latitude}, ${data.cheapest.Longitude})">
+                    Navigate to Best Lab
+                </button>
+            </div>
+
+            <h2 class="table-title">Available Lab Options</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Lab Name</th>
+                        <th>Test Name</th>
+                        <th>Price</th>
+                        <th>City</th>
+                        <th>Area</th>
+                        <th>Navigation</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        data.results.forEach(item => {
+            html += `
+                <tr>
+                    <td>${item.Lab_Name}</td>
+                    <td>${item.Test_Name}</td>
+                    <td>₹${item.Price}</td>
+                    <td>${item.City}</td>
+                    <td>${item.Area}</td>
+                    <td>
+                        <button class="table-map-btn" onclick="openCurrentLocationMap(${item.Latitude}, ${item.Longitude})">
+                            Navigate
+                        </button>
+                    </td>
+                </tr>
             `;
-
-                resultsDiv.appendChild(card);
-            });
-        })
-        .catch(error => {
-            console.error("Error:", error);
-            document.getElementById("results").innerHTML = `<p class="no-results">Something went wrong.</p>`;
         });
+
+        html += `
+                </tbody>
+            </table>
+        `;
+
+        resultSection.innerHTML = html;
+
+    } catch (error) {
+        resultSection.innerHTML = `<p class="error">Something went wrong. Please try again.</p>`;
+        console.error(error);
+    }
 }
 
-function uploadPrescription() {
-    const fileInput = document.getElementById("prescription");
-    const file = fileInput.files[0];
+function toggleChat() {
+    const chatBox = document.getElementById("chatBox");
+    chatBox.style.display = chatBox.style.display === "block" ? "none" : "block";
+}
 
-    if (!file) {
-        alert("Please select an image.");
+async function askAI() {
+    const messageInput = document.getElementById("userMessage");
+    const message = messageInput.value.trim();
+    const chatMessages = document.getElementById("chatMessages");
+
+    if (message === "") {
+        alert("Please type a question");
         return;
     }
 
-    const formData = new FormData();
-    formData.append("prescription", file);
+    chatMessages.innerHTML += `<p class="user">${message}</p>`;
+    messageInput.value = "";
+    chatMessages.scrollTop = chatMessages.scrollHeight;
 
-    fetch("/upload-prescription", {
-        method: "POST",
-        body: formData
-    })
-        .then(response => response.json())
-        .then(data => {
-            const ocrDiv = document.getElementById("ocr-result");
-
-            if (data.error) {
-                ocrDiv.innerHTML = `<p class="no-results">${data.error}</p>`;
-                return;
-            }
-
-            let html = `<h3>Detected Tests</h3>`;
-
-            if (data.matched_tests.length === 0) {
-                html += `<p>No matching tests detected.</p>`;
-            } else {
-                html += `<ul>`;
-                data.matched_tests.forEach(test => {
-                    html += `<li onclick="selectDetectedTest('${test}')" class="detected-test">${test}</li>`;
-                });
-                html += `</ul>`;
-            }
-
-            ocrDiv.innerHTML = html;
-        })
-        .catch(error => {
-            console.error("Upload error:", error);
-            document.getElementById("ocr-result").innerHTML = `<p class="no-results">Upload failed.</p>`;
+    try {
+        const response = await fetch("/ai-assistant", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ message })
         });
+
+        const data = await response.json();
+
+        chatMessages.innerHTML += `<p class="bot">${data.reply}</p>`;
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+
+    } catch (error) {
+        chatMessages.innerHTML += `<p class="bot">Sorry, something went wrong.</p>`;
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        console.error(error);
+    }
 }
 
-function selectDetectedTest(test) {
-    document.getElementById("test_name").value = test;
-    searchTests();
+function startVoiceInput() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+        alert("Speech recognition is not supported in this browser. Use Chrome or Edge.");
+        return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-IN";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.start();
+
+    recognition.onresult = function (event) {
+        const transcript = event.results[0][0].transcript;
+        document.getElementById("userMessage").value = transcript;
+        askAI();
+    };
+
+    recognition.onerror = function (event) {
+        alert("Microphone error: " + event.error);
+    };
 }
 
-function navigateToLab(lat, lon) {
+function openCurrentLocationMap(destinationLat, destinationLng) {
     if (!navigator.geolocation) {
-        alert("Geolocation is not supported.");
+        alert("Location is not supported in this browser.");
         return;
     }
 
     navigator.geolocation.getCurrentPosition(
         function (position) {
-            const userLat = position.coords.latitude;
-            const userLon = position.coords.longitude;
-            const url = `https://www.google.com/maps/dir/${userLat},${userLon}/${lat},${lon}`;
-            window.open(url, "_blank");
+            const currentLat = position.coords.latitude;
+            const currentLng = position.coords.longitude;
+
+            const mapsUrl =
+                `https://www.google.com/maps/dir/?api=1&origin=${currentLat},${currentLng}&destination=${destinationLat},${destinationLng}&travelmode=driving`;
+
+            window.open(mapsUrl, "_blank");
         },
-        function (error) {
-            alert("Could not get current location.");
-            console.error(error);
+        function () {
+            const mapsUrl =
+                `https://www.google.com/maps/dir/?api=1&destination=${destinationLat},${destinationLng}&travelmode=driving`;
+
+            window.open(mapsUrl, "_blank");
         }
     );
+}
+
+function uploadPrescription() {
+    alert("Prescription upload is added as future scope. Next version can use OCR to read test names.");
 }
